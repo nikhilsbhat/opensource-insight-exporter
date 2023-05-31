@@ -5,8 +5,6 @@ const (
 	ExporterConfigFileExt         = "yaml"
 	OpenSourceInsightExporterName = "opensource_insight_exporter"
 	DownloadMetrics               = "downloads_count"
-	LogCategoryMsg                = "msg"
-	LogCategoryErr                = "err"
 )
 
 const (

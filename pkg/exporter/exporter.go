@@ -1,7 +1,6 @@
 package exporter
 
 import (
-	"github.com/go-kit/log/level"
 	"github.com/nikhilsbhat/opensource-insight-exporter/pkg/common"
 	insight2 "github.com/nikhilsbhat/opensource-insight-exporter/pkg/insight"
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,7 +14,7 @@ func (e *Exporter) collect(channel chan<- prometheus.Metric) {
 		case common.PlatformGithub:
 			summary, ok := insight.Summary.([]insight2.GitRelease)
 			if !ok {
-				level.Error(e.logger).Log(common.LogCategoryErr, "failed to typecast to []insight.GitRelease") //nolint:errcheck
+				e.logger.Error("failed to typecast to []insight.GitRelease")
 			}
 
 			for _, smry := range summary {
@@ -30,7 +29,7 @@ func (e *Exporter) collect(channel chan<- prometheus.Metric) {
 		case common.PlatformTerraform:
 			summary, ok := insight.Summary.(insight2.ProviderDownloadSummary)
 			if !ok {
-				level.Error(e.logger).Log(common.LogCategoryErr, "failed to typecast to insight.ProviderDownloadSummary") //nolint:errcheck
+				e.logger.Errorf("failed to typecast to insight.ProviderDownloadSummary")
 			}
 
 			attributes := summary.Data.Attributes

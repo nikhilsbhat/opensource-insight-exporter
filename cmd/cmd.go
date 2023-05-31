@@ -9,14 +9,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-kit/log/level"
+	"github.com/nikhilsbhat/gocd-sdk-go"
 	"github.com/nikhilsbhat/opensource-insight-exporter/pkg/common"
 	"github.com/nikhilsbhat/opensource-insight-exporter/pkg/exporter"
 	"github.com/nikhilsbhat/opensource-insight-exporter/pkg/insight"
 	"github.com/nikhilsbhat/opensource-insight-exporter/version"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/common/promlog"
+	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
 
@@ -54,6 +54,12 @@ func App() *cli.App {
 		UsageText:            "opensource-insighter-exporter [flags]",
 		EnableBashCompletion: true,
 		HideHelp:             false,
+		Authors: []*cli.Author{
+			{
+				Name:  "Nikhil Bhat",
+				Email: "nikhilsbhat93@gmail.com",
+			},
+		},
 		Commands: []*cli.Command{
 			{
 				Name:    "version",
@@ -108,6 +114,11 @@ func registerFlags() []cli.Flag {
 }
 
 func insightExporter(context *cli.Context) error {
+	logger := logrus.New()
+	logger.SetLevel(gocd.GetLoglevel(context.String(flagLogLevel)))
+	logger.WithField(common.OpenSourceInsightName, true)
+	logger.SetFormatter(&logrus.JSONFormatter{})
+
 	config := insight.Config{
 		LogLevel: context.String(flagLogLevel),
 	}
@@ -117,15 +128,9 @@ func insightExporter(context *cli.Context) error {
 		return fmt.Errorf("%w", err)
 	}
 
-	fmt.Println("final config", cfg)
+	cfg.SetLogger(logger)
 
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGQUIT) //nolint:govet
-
-	promLogConfig := &promlog.Config{Level: &promlog.AllowedLevel{}, Format: &promlog.AllowedFormat{}}
-	if err = promLogConfig.Level.Set(config.LogLevel); err != nil {
-		return fmt.Errorf("configuring logger errored with: %w", err)
-	}
-	logger := promlog.New(promLogConfig)
 
 	exporterInsight := exporter.NewExporter(logger, *cfg)
 	prometheus.MustRegister(exporterInsight)
@@ -137,9 +142,9 @@ func insightExporter(context *cli.Context) error {
 	// listens to terminate signal
 	go func() {
 		sig := <-sigChan
-		level.Info(logger).Log("msg", fmt.Sprintf("caught signal %v: terminating in %v", sig, appGraceDuration)) //nolint:errcheck
+		logger.Infof("caught signal %v: terminating in %v", sig, appGraceDuration)
 		time.Sleep(appGraceDuration)
-		level.Info(logger).Log("msg", fmt.Sprintf("terminate opensource-insight-exporter running on port: %d", exporterPort)) //nolint:errcheck
+		logger.Infof("terminate opensource-insight-exporter running on port: %d", exporterPort)
 		os.Exit(0)
 	}()
 
@@ -147,8 +152,8 @@ func insightExporter(context *cli.Context) error {
 		_, _ = w.Write([]byte(getRedirectData(exporterEndpoint)))
 	})
 
-	level.Info(logger).Log(common.LogCategoryMsg, fmt.Sprintf("metrics will be exposed on port: %d", exporterPort))         //nolint:errcheck
-	level.Info(logger).Log(common.LogCategoryMsg, fmt.Sprintf("metrics will be exposed on endpoint: %s", exporterEndpoint)) //nolint:errcheck
+	logger.Infof("metrics will be exposed on port: %d", exporterPort)
+	logger.Infof("metrics will be exposed on endpoint: %s", exporterEndpoint)
 
 	http.Handle(exporterEndpoint, promhttp.Handler())
 

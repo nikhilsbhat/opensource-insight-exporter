@@ -7,12 +7,15 @@ import (
 	"os"
 
 	"github.com/imdario/mergo"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
+// Config holds the configuration of multiple projects for which metrics need to be collected.
 type Config struct {
 	Sources  []Source `json:"sources,omitempty" yaml:"sources,omitempty"`
 	LogLevel string   `json:"log_level,omitempty" yaml:"log_level,omitempty"`
+	logger   *logrus.Logger
 }
 
 // GetConfig returns the new instance of Config.
@@ -43,4 +46,8 @@ func GetConfig(conf Config, path string) (*Config, error) {
 	}
 
 	return &newConfig, nil
+}
+
+func (cfg *Config) SetLogger(logger *logrus.Logger) {
+	cfg.logger = logger
 }

@@ -2,47 +2,41 @@ package insight
 
 import (
 	"os"
-
-	"github.com/nikhilsbhat/gocd-sdk-go"
-	"github.com/nikhilsbhat/opensource-insight-exporter/pkg/common"
-	"github.com/sirupsen/logrus"
 )
 
+// Insight holds the download metrics for a particular project.
 type Insight struct {
-	Platform string
-	ID       string
-	Summary  any
+	Platform string `json:"platform,omitempty" yaml:"platform,omitempty"`
+	ID       string `json:"id,omitempty" yaml:"id,omitempty"`
+	Summary  any    `json:"summary,omitempty" yaml:"summary,omitempty"`
 }
 
-func (c *Config) GetInsight() []Insight {
-	logger := logrus.New()
-	logger.SetLevel(gocd.GetLoglevel(c.LogLevel))
-	logger.WithField(common.OpenSourceInsightName, true)
-	logger.SetFormatter(&logrus.JSONFormatter{})
-
+// GetInsight gets insight into the downloads of all specified projects.
+func (cfg *Config) GetInsight() []Insight {
 	insight := make([]Insight, 0)
-	for _, source := range c.Sources {
-		source.SetLogger(logger)
+	for _, source := range cfg.Sources {
+		source.SetLogger(cfg.logger)
 
 		caContent := make([]byte, 0)
 		if len(source.CaFilePath) != 0 {
 			ca, err := os.ReadFile(source.CaFilePath)
 			if err != nil {
-				logger.Errorf("reading ca file errored with %v", err)
+				cfg.logger.Errorf("reading ca file errored with %v", err)
 			}
 			caContent = ca
 		}
 
 		httpClient := source.NewClient(caContent)
 
-		for _, sourceID := range source.IDs {
-			summary, err := source.Metrics(sourceID, httpClient)
+		for _, sourceID := range source.ResourceIDs {
+			summary, err := source.Metrics(sourceID.ID, httpClient)
 			if err != nil {
-				logger.Errorf("fetching download metrics with id '%s' of platform '%s' errored with: '%v'", sourceID, source.Platform, err)
+				cfg.logger.Errorf("fetching download metrics with id '%s' of platform '%s' errored with: '%v'", sourceID, source.Platform, err)
 			}
+
 			insight = append(insight, Insight{
 				Platform: source.Platform,
-				ID:       sourceID,
+				ID:       sourceID.GetID(),
 				Summary:  summary,
 			})
 		}

@@ -1,0 +1,28 @@
+version: '3.7'
+
+services:
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./:/etc/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana-oss
+    ports:
+      - "3000:3000"
+#    environment:
+#      - GF_PATHS_CONFIG=/etc/grafana/custom.ini
+#    volumes:
+#      - ./config/grafana/custom.ini:/etc/grafana/custom.ini
+#      - ./config/grafana/provisioning/:/etc/grafana/provisioning/
+#      - type: bind
+#        source: ./config/grafana/dashboard.json
+#        target: /var/lib/grafana/dashboards/curity/idsvr-dashboard.json
+    links:
+      - prometheus
+
