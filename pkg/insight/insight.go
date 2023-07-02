@@ -2,6 +2,8 @@ package insight
 
 import (
 	"os"
+
+	"github.com/nikhilsbhat/opensource-insight-exporter/pkg/common"
 )
 
 // Insight holds the download metrics for a particular project.
@@ -29,16 +31,30 @@ func (cfg *Config) GetInsight() []Insight {
 		httpClient := source.NewClient(caContent)
 
 		for _, sourceID := range source.ResourceIDs {
-			summary, err := source.Metrics(sourceID.ID, httpClient)
-			if err != nil {
-				cfg.logger.Errorf("fetching download metrics with id '%s' of platform '%s' errored with: '%v'", sourceID, source.Platform, err)
-			}
+			switch source.Platform {
+			case common.PlatformGithub:
+				summary, err := source.GitHubMetrics(sourceID.ID, httpClient)
+				if err != nil {
+					cfg.logger.Errorf("fetching download metrics with id '%s' of platform '%s' errored with: '%v'", sourceID, source.Platform, err)
+				}
 
-			insight = append(insight, Insight{
-				Platform: source.Platform,
-				ID:       sourceID.GetID(),
-				Summary:  summary,
-			})
+				insight = append(insight, Insight{
+					Platform: source.Platform,
+					ID:       sourceID.GetID(),
+					Summary:  summary,
+				})
+			case common.PlatformTerraform:
+				summary, err := source.TerraformMetrics(sourceID.Name, sourceID.ID, httpClient)
+				if err != nil {
+					cfg.logger.Errorf("fetching download metrics with id '%s' of platform '%s' errored with: '%v'", sourceID, source.Platform, err)
+				}
+
+				insight = append(insight, Insight{
+					Platform: source.Platform,
+					ID:       sourceID.GetID(),
+					Summary:  summary,
+				})
+			}
 		}
 	}
 

@@ -1,13 +1,20 @@
 package exporter
 
 import (
+	"time"
+
 	"github.com/nikhilsbhat/opensource-insight-exporter/pkg/common"
 	insight2 "github.com/nikhilsbhat/opensource-insight-exporter/pkg/insight"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 func (e *Exporter) collect(channel chan<- prometheus.Metric) {
+	timeBeforeCalculation := time.Now()
 	insights := e.config.GetInsight()
+
+	timeAfterCalculation := time.Now()
+	timeConsumed := timeAfterCalculation.Sub(timeBeforeCalculation)
+	e.logger.Infof("time taken to collect the metrics is: %v", timeConsumed)
 
 	for _, insight := range insights {
 		switch insight.Platform {
@@ -27,16 +34,17 @@ func (e *Exporter) collect(channel chan<- prometheus.Metric) {
 				}
 			}
 		case common.PlatformTerraform:
-			summary, ok := insight.Summary.(insight2.ProviderDownloadSummary)
+			summary, ok := insight.Summary.([]insight2.ProviderDownloadSummary)
 			if !ok {
 				e.logger.Errorf("failed to typecast to insight.ProviderDownloadSummary")
 			}
 
-			attributes := summary.Data.Attributes
-			e.downloadMetricCount.WithLabelValues(insight.Platform, insight.ID, "", "", "week").Set(common.Float(attributes.Week))
-			e.downloadMetricCount.WithLabelValues(insight.Platform, insight.ID, "", "", "month").Set(common.Float(attributes.Month))
-			e.downloadMetricCount.WithLabelValues(insight.Platform, insight.ID, "", "", "year").Set(common.Float(attributes.Year))
-			e.downloadMetricCount.WithLabelValues(insight.Platform, insight.ID, "", "", "total").Set(common.Float(attributes.Total))
+			for _, smry := range summary {
+				e.downloadMetricCount.WithLabelValues(insight.Platform, insight.ID, smry.Data.ID, "", "week").Set(common.Float(smry.Data.Attributes.Week))
+				e.downloadMetricCount.WithLabelValues(insight.Platform, insight.ID, smry.Data.ID, "", "month").Set(common.Float(smry.Data.Attributes.Month))
+				e.downloadMetricCount.WithLabelValues(insight.Platform, insight.ID, smry.Data.ID, "", "year").Set(common.Float(smry.Data.Attributes.Year))
+				e.downloadMetricCount.WithLabelValues(insight.Platform, insight.ID, smry.Data.ID, "", "total").Set(common.Float(smry.Data.Attributes.Total))
+			}
 		}
 	}
 

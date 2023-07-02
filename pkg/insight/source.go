@@ -30,6 +30,7 @@ type Source struct {
 // OpensourceID holds information about the ID of the project for which metrics are to be pulled.
 type OpensourceID struct {
 	ID    string `json:"id,omitempty" yaml:"id,omitempty"`
+	Name  string `json:"name,omitempty" yaml:"name,omitempty"`
 	Alias string `json:"alias,omitempty" yaml:"alias,omitempty"`
 }
 
@@ -66,21 +67,14 @@ func (s *Source) SetLogger(log *logrus.Logger) {
 	s.logger = log
 }
 
-// Metrics is responsible for making https calls to pull the metrics for the appropriate project.
-func (s *Source) Metrics(sourceID string, httpClient *resty.Client) (any, error) {
+// GitHubMetrics is responsible for making https calls to pull the metrics for the appropriate project.
+func (s *Source) GitHubMetrics(sourceID string, httpClient *resty.Client) (any, error) {
 	newClient := resty.New()
 	if err := copier.CopyWithOption(newClient, httpClient, copier.Option{IgnoreEmpty: true, DeepCopy: true}); err != nil {
 		return nil, fmt.Errorf("%w", err)
 	}
 
-	var endPoint string
-
-	switch s.Platform {
-	case common.PlatformGithub:
-		endPoint = filepath.Join(sourceID, "releases")
-	case common.PlatformTerraform:
-		endPoint = filepath.Join(sourceID, "/downloads/summary")
-	}
+	endPoint := filepath.Join(sourceID, "releases")
 
 	response, err := newClient.R().Get(endPoint)
 	if err != nil {
@@ -91,29 +85,61 @@ func (s *Source) Metrics(sourceID string, httpClient *resty.Client) (any, error)
 		return nil, fmt.Errorf("fetching download metrics returned non ok status code '%d' with body: ", response.StatusCode())
 	}
 
-	return s.ReadResponse(response.Body())
+	var gitRelease []GitRelease
+	if err = json.Unmarshal(response.Body(), &gitRelease); err != nil {
+		return nil, fmt.Errorf("%w", err)
+	}
+
+	return gitRelease, nil
 }
 
-// ReadResponse reads the response from the http calls made to fetch the download metrics of the project.
-func (s *Source) ReadResponse(body []byte) (any, error) {
-	switch s.Platform {
-	case common.PlatformGithub:
-		var gitRelease []GitRelease
-		if err := json.Unmarshal(body, &gitRelease); err != nil {
-			return nil, fmt.Errorf("%w", err)
-		}
+// TerraformMetrics is responsible for making https calls to pull the metrics for the appropriate project from terraform.
+func (s *Source) TerraformMetrics(name, sourceID string, httpClient *resty.Client) (any, error) {
+	versionsEndpoint := fmt.Sprintf("v1/providers/%s", name)
+	versionHTTPClient := s.NewClient(nil)
 
-		return gitRelease, nil
-	case common.PlatformTerraform:
-		var downloadSummary ProviderDownloadSummary
-		if err := json.Unmarshal(body, &downloadSummary); err != nil {
-			return nil, fmt.Errorf("%w", err)
-		}
-
-		return downloadSummary, nil
-	default:
-		return nil, fmt.Errorf("unknown platform")
+	versionResponse, err := versionHTTPClient.R().Get(versionsEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("%w", err)
 	}
+
+	if versionResponse.StatusCode() != http.StatusOK {
+		return nil, fmt.Errorf("fetching provider versions returned non ok status code '%d' with body: ", versionResponse.StatusCode())
+	}
+
+	var versions ProviderVersion
+
+	if err = json.Unmarshal(versionResponse.Body(), &versions); err != nil {
+		return nil, fmt.Errorf("%w", err)
+	}
+
+	downloadMetrics := make([]ProviderDownloadSummary, 0)
+
+	for _, ver := range versions.Versions {
+		newClient := resty.New()
+		if err = copier.CopyWithOption(newClient, httpClient, copier.Option{IgnoreEmpty: true, DeepCopy: true}); err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+
+		endPoint := fmt.Sprintf("v2/providers/%s/downloads/summary?filter[version]=%s", sourceID, ver)
+		downloadResponse, err := newClient.R().Get(endPoint)
+		if err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+
+		if downloadResponse.StatusCode() != http.StatusOK {
+			return nil, fmt.Errorf("fetching download metrics returned non ok status code '%d' with body: ", downloadResponse.StatusCode())
+		}
+
+		var downloadMetric ProviderDownloadSummary
+		if err = json.Unmarshal(downloadResponse.Body(), &downloadMetric); err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+
+		downloadMetrics = append(downloadMetrics, downloadMetric)
+	}
+
+	return downloadMetrics, nil
 }
 
 // GetPlatform returns the platform by identifying it from the URL of the project passed.
@@ -132,6 +158,10 @@ func (s *Source) GetPlatform() (string, error) {
 func (id OpensourceID) GetID() string {
 	if len(id.Alias) != 0 {
 		return id.Alias
+	}
+
+	if len(id.Name) != 0 {
+		return id.Name
 	}
 
 	return id.ID
