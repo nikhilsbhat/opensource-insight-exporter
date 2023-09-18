@@ -29,12 +29,12 @@ var (
 
 // BuildInfo represents version of utility.
 type BuildInfo struct {
-	Version     string
-	Revision    string
-	Environment string
-	BuildDate   string
-	GoVersion   string
-	Platform    string
+	Version     string `json:"version,omitempty" yaml:"version,omitempty"`
+	Revision    string `json:"revision,omitempty" yaml:"revision,omitempty"`
+	Environment string `json:"environment,omitempty" yaml:"environment,omitempty"`
+	BuildDate   string `json:"buildDate,omitempty" yaml:"buildDate,omitempty"`
+	GoVersion   string `json:"goVersion,omitempty" yaml:"goVersion,omitempty"`
+	Platform    string `json:"platform,omitempty" yaml:"platform,omitempty"`
 }
 
 // GetBuildInfo return the version and other build info of the application.
@@ -53,7 +53,7 @@ func GetBuildInfo() BuildInfo {
 	}
 }
 
-func AppVersion(c *cli.Context) error {
+func AppVersion(_ *cli.Context) error {
 	buildInfo, err := json.Marshal(GetBuildInfo())
 	if err != nil {
 		return fmt.Errorf("fetching app version errored with: %w", err)

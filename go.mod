@@ -1,6 +1,6 @@
 module github.com/nikhilsbhat/opensource-insight-exporter
 
-go 1.19
+go 1.21
 
 require (
 	github.com/go-resty/resty/v2 v2.7.0
