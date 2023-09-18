@@ -1,0 +1,18 @@
+---
+log_level: info
+sources:
+  - platform: github
+    base_url: https://api.github.com/repos/<github_username>
+    resource_ids:
+      - id: project-1
+      - id: project-2
+      - id: project-3
+  - platform: terraform
+    base_url: https://registry.terraform.io
+    resource_ids:
+      - name: sample_org/sample_project_1
+        id: 3765
+        alias: terraform-provider-example1
+      - name: sample_org/sample_project_2
+        id: 3943
+        alias: terraform-provider-example2
