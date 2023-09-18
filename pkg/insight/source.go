@@ -14,6 +14,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/jinzhu/copier"
 	"github.com/nikhilsbhat/opensource-insight-exporter/pkg/common"
+	"github.com/nikhilsbhat/opensource-insight-exporter/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -82,7 +83,7 @@ func (s *Source) GitHubMetrics(sourceID string, httpClient *resty.Client) (any, 
 	}
 
 	if response.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("fetching download metrics returned non ok status code '%d' with body: ", response.StatusCode())
+		return nil, &errors.NonOkError{Code: response.StatusCode(), Response: response, Operation: "download metrics"}
 	}
 
 	var gitRelease []GitRelease
@@ -104,7 +105,7 @@ func (s *Source) TerraformMetrics(name, sourceID string, httpClient *resty.Clien
 	}
 
 	if versionResponse.StatusCode() != http.StatusOK {
-		return nil, fmt.Errorf("fetching provider versions returned non ok status code '%d' with body: ", versionResponse.StatusCode())
+		return nil, &errors.NonOkError{Code: versionResponse.StatusCode(), Response: versionResponse, Operation: "provider versions"}
 	}
 
 	var versions ProviderVersion
@@ -128,7 +129,7 @@ func (s *Source) TerraformMetrics(name, sourceID string, httpClient *resty.Clien
 		}
 
 		if downloadResponse.StatusCode() != http.StatusOK {
-			return nil, fmt.Errorf("fetching download metrics returned non ok status code '%d' with body: ", downloadResponse.StatusCode())
+			return nil, &errors.NonOkError{Code: versionResponse.StatusCode(), Response: versionResponse, Operation: "download metrics"}
 		}
 
 		var downloadMetric ProviderDownloadSummary
@@ -151,7 +152,7 @@ func (s *Source) GetPlatform() (string, error) {
 		return common.PlatformGithub, nil
 	}
 
-	return "", fmt.Errorf("unknown platform, either insighter doesnot support the platform currently or platform doesnot exists: %s", s.BaseURL)
+	return "", &errors.UnknownPlatformError{Platform: s.BaseURL}
 }
 
 // GetID gets ID of the project by validating the alias if set.
